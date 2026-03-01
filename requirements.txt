@@ -1,0 +1,17 @@
+torch
+transformers
+opencv-python
+numpy
+Pillow
+librosa
+soundfile
+ffmpeg-python
+matplotlib
+fastapi
+uvicorn[standard]
+python-multipart
+
+
+# uvicorn app:app --reload --port 8000   
+
+# cd frontend && npm run dev

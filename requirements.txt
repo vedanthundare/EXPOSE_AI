@@ -10,6 +10,7 @@ matplotlib
 fastapi
 uvicorn[standard]
 python-multipart
+gunicorn
 
 
 # uvicorn app:app --reload --port 8000   

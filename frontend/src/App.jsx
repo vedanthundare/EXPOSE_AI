@@ -1,8 +1,27 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { GlowingEffect } from "./components/ui/glowing-effect";
 import { ShinyButton } from "./components/ui/shiny-button";
 import { CoreSpinLoader } from "./components/ui/core-spin-loader";
+
+// Typewriter hook — streams text char by char
+function useTypewriter(text, speed = 18, active = true) {
+  const [displayed, setDisplayed] = useState("");
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    if (!active || !text) { setDisplayed(""); setDone(false); return; }
+    setDisplayed("");
+    setDone(false);
+    let i = 0;
+    const id = setInterval(() => {
+      i++;
+      setDisplayed(text.slice(0, i));
+      if (i >= text.length) { clearInterval(id); setDone(true); }
+    }, speed);
+    return () => clearInterval(id);
+  }, [text, speed, active]);
+  return { displayed, done };
+}
 
 const API_BASE_URL = "http://localhost:8000";
 
@@ -188,6 +207,71 @@ function ProgressBar({ label, value, subtitle }) {
       <div className="text-right mt-3 text-[#00F0FF] font-mono text-xs tracking-widest drop-shadow-[0_0_5px_rgba(0,240,255,0.3)]">
         {pct}% PROBABILITY
       </div>
+    </div>
+  );
+}
+
+// ─── LLM Audit Terminal Panel ────────────────────────────────────────────────
+function LlmAuditPanel({ audit }) {
+  const { displayed, done } = useTypewriter(audit.explanation, 16, true);
+  const isConsistent = audit.consistency?.toUpperCase() === "CONSISTENT";
+  const confidenceColor = {
+    HIGH: "#00F0FF",
+    MEDIUM: "#FFA500",
+    LOW: "#FF003C",
+  }[audit.confidence_level?.toUpperCase()] ?? "#828282";
+
+  return (
+    <div className="border border-white/10 bg-black/60 backdrop-blur-md overflow-hidden">
+      {/* Header bar */}
+      <div className="flex items-center gap-3 px-5 py-3 border-b border-white/10 bg-white/[0.02]">
+        <span className="w-2 h-2 rounded-full bg-[#00F0FF] animate-pulse" />
+        <span className="font-mono text-[0.7rem] uppercase tracking-[0.25em] text-[#00F0FF]">LLM Intelligence Audit</span>
+        <span className="ml-auto font-mono text-[0.6rem] text-[#545454] tracking-widest">EXPOSE-AI // FORENSIC MATRIX</span>
+      </div>
+
+      {/* Field rows */}
+      <div className="grid grid-cols-2 border-b border-white/10">
+        <div className="px-5 py-4 border-r border-white/10">
+          <div className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-[#545454] mb-1">MODALITY CONSISTENCY</div>
+          <div className={`font-mono text-[0.95rem] font-bold ${isConsistent ? 'text-[#00F0FF]' : 'text-[#FFA500]'}`}>
+            {audit.consistency?.toUpperCase()}
+          </div>
+        </div>
+        <div className="px-5 py-4">
+          <div className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-[#545454] mb-1">AUDIT CONFIDENCE</div>
+          <div className="font-mono text-[0.95rem] font-bold" style={{ color: confidenceColor }}>
+            {audit.confidence_level?.toUpperCase()}
+          </div>
+        </div>
+      </div>
+
+      {/* Typewriter explanation */}
+      <div className="px-5 py-5">
+        <div className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-[#545454] mb-3">NARRATIVE SUMMARY</div>
+        <p className="font-mono text-[0.82rem] leading-[1.75] text-[#a0a0a0]">
+          {displayed}
+          {!done && (
+            <motion.span
+              animate={{ opacity: [1, 0] }}
+              transition={{ repeat: Infinity, duration: 0.6 }}
+              className="inline-block w-[2px] h-[0.9em] bg-[#00F0FF] ml-0.5 align-middle"
+            />
+          )}
+        </p>
+      </div>
+
+      {/* Warnings */}
+      {Array.isArray(audit.warnings) && audit.warnings.length > 0 && (
+        <div className="border-t border-white/10 px-5 py-4 space-y-2">
+          {audit.warnings.map((w, i) => (
+            <div key={i} className="flex items-start gap-2 font-mono text-[0.72rem] text-[#FFA500]">
+              <span className="shrink-0 mt-0.5 opacity-60">//</span>
+              <span>{w.toUpperCase()}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -644,36 +728,7 @@ export default function App() {
 
                   {result.llm_audit && (
                     <RevealBlock>
-                      <div className="lg:col-span-2 p-6 md:p-8 border border-white/10 bg-gradient-to-b from-white/5 to-transparent">
-                        <h3 className="text-[1.1rem] md:text-[1.2rem] mb-6 font-mono uppercase text-white">LLM INTELLIGENCE AUDIT</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                          <div>
-                            <span className="font-mono text-[0.7rem] uppercase text-[#545454] block mb-1">MODALITY CONSISTENCY</span>
-                            <span className="text-[1.2rem] font-['Syne',sans-serif] block text-white">
-                              {result.llm_audit.consistency.toUpperCase()}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="font-mono text-[0.7rem] uppercase text-[#545454] block mb-1">AUDIT CONFIDENCE</span>
-                            <span className="text-[1.2rem] font-['Syne',sans-serif] block text-white">
-                              {result.llm_audit.confidence_level.toUpperCase()}
-                            </span>
-                          </div>
-                        </div>
-                        <p className="text-[0.95rem] leading-[1.6] text-[#828282] my-4">
-                          {result.llm_audit.explanation}
-                        </p>
-                        {Array.isArray(result.llm_audit.warnings) &&
-                          result.llm_audit.warnings.length > 0 && (
-                            <ul className="list-none pt-4 space-y-4">
-                              {result.llm_audit.warnings.map((w, idx) => (
-                                <li key={idx} className="p-4 border border-[#FFA500] text-[#FFA500] bg-[#FFA500]/5 font-mono text-[0.8rem]">
-                                  // {w.toUpperCase()}
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                      </div>
+                      <LlmAuditPanel audit={result.llm_audit} />
                     </RevealBlock>
                   )}
                 </motion.div>
